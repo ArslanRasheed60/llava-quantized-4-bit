@@ -3,3 +3,5 @@ uvicorn
 gradio
 requests
 pillow
+transformers
+llava
