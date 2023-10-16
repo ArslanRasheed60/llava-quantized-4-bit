@@ -66,6 +66,10 @@ from typing import Dict
 
 app = FastAPI()
 
+@app.get("/")
+async def index():
+    return {"model": "working"}
+
 @app.post("/generate")
 async def generate_caption(file: UploadFile = File(...), prompt: str = ""):
     image_bytes = await file.read()
