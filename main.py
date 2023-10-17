@@ -1,6 +1,3 @@
-from fastapi import FastAPI, File, UploadFile
-from io import BytesIO
-
 from transformers import AutoTokenizer, BitsAndBytesConfig
 from llava.model import LlavaLlamaForCausalLM
 import torch
@@ -32,6 +29,7 @@ from llava.utils import disable_torch_init
 from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
 from llava.mm_utils import tokenizer_image_token, get_model_name_from_path, KeywordsStoppingCriteria
 from transformers import TextStreamer
+from fastapi import FastAPI, Header, Form, Request
 
 def caption_image(image_file, prompt):
     if image_file.startswith('http') or image_file.startswith('https'):
@@ -61,8 +59,6 @@ def caption_image(image_file, prompt):
     output = outputs.rsplit('</s>', 1)[0]
     return image, output
 
-from fastapi import FastAPI
-from typing import Dict
 
 app = FastAPI()
 
@@ -70,10 +66,27 @@ app = FastAPI()
 async def index():
     return {"model": "working"}
 
+def get_image_from_url(url, auth_sid,auth_token):
+    response = requests.get(url,auth=(auth_sid, auth_token))
+    if response.status_code == 200:
+        image_bytes = BytesIO(response.content)
+        image = Image.open(image_bytes).convert('RGB')
+        return image
+    else:
+        return None
+
 @app.post("/generate")
-async def generate_caption(file: UploadFile = File(...), prompt: str = ""):
-    image_bytes = await file.read()
-    image = Image.open(BytesIO(image_bytes)).convert('RGB')
-    result = caption_image(image, prompt)
-    return {"result": result}
+async def generate_caption( request: Request, url: str = Form(...), prompt: str = Form(...)):
+    headers = request.headers
+
+    # Access specific header values
+    auth_sid = headers.get("Authorization-SID")
+    auth_token = headers.get("Authorization-Token")
+    # print("r", url, auth_sid, auth_token, prompt)
+    image = get_image_from_url(url, auth_sid, auth_token)
+    if image:
+        result = caption_image(image, prompt)
+        return {"result": result}
+    else:
+        return {"error": "Failed to process the image"}
 
