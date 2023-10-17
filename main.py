@@ -31,9 +31,9 @@ from llava.mm_utils import tokenizer_image_token, get_model_name_from_path, Keyw
 from transformers import TextStreamer
 from fastapi import FastAPI, Header, Form, Request
 
-def caption_image(image_file, prompt):
+def caption_image(image_file, prompt, auth_sid, auth_token):
     if image_file.startswith('http') or image_file.startswith('https'):
-        response = requests.get(image_file)
+        response = requests.get(image_file,auth=(auth_sid, auth_token))
         image = Image.open(BytesIO(response.content)).convert('RGB')
     else:
         image = Image.open(image_file).convert('RGB')
@@ -66,15 +66,6 @@ app = FastAPI()
 async def index():
     return {"model": "working"}
 
-def get_image_from_url(url, auth_sid,auth_token):
-    response = requests.get(url,auth=(auth_sid, auth_token))
-    if response.status_code == 200:
-        image_bytes = BytesIO(response.content)
-        image = Image.open(image_bytes).convert('RGB')
-        return image
-    else:
-        return None
-
 @app.post("/generate")
 async def generate_caption( request: Request, url: str = Form(...), prompt: str = Form(...)):
     headers = request.headers
@@ -82,11 +73,10 @@ async def generate_caption( request: Request, url: str = Form(...), prompt: str 
     # Access specific header values
     auth_sid = headers.get("Authorization-SID")
     auth_token = headers.get("Authorization-Token")
-    # print("r", url, auth_sid, auth_token, prompt)
-    image = get_image_from_url(url, auth_sid, auth_token)
-    if image:
-        result = caption_image(image, prompt)
-        return {"result": result}
+
+    if url:
+        image, output = caption_image(url, prompt, auth_sid, auth_token)
+        return {"result": output}
     else:
         return {"error": "Failed to process the image"}
 
